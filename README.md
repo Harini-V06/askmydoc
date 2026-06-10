@@ -79,5 +79,13 @@ chunks + question sent to Groq LLM
      ↓
 answer returned ✦
 ```
-
+---
+ 
+## What I learned building this
+ 
+- How RAG pipelines work end-to-end: chunking strategy matters a lot for answer quality
+- FAISS similarity search and how embedding distance maps to semantic relevance  
+- LangChain LCEL for composing retrieval chains
+- Managing Streamlit session state for multi-turn chat
+---
 ---
