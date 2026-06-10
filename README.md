@@ -2,8 +2,7 @@
 
 > upload any pdf. ask anything. get instant answers.
 
-**Live Demo →** [askmydoc.streamlit.app](https://askmydoc.streamlit.app)
-
+**Live Demo →** [askmydoc6767.streamlit.app](https://askmydoc6767.streamlit.app)
 ---
 
 ## 📌 what is this?
