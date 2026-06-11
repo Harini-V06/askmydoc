@@ -88,4 +88,6 @@ answer returned ✦
 - LangChain LCEL for composing retrieval chains
 - Managing Streamlit session state for multi-turn chat
 ---
+## Screenshots 📷
+
 ---
