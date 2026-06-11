@@ -89,5 +89,8 @@ answer returned ✦
 - Managing Streamlit session state for multi-turn chat
 ---
 ## Screenshots 📷
+<img width="958" height="470" alt="askmydoc_0" src="https://github.com/user-attachments/assets/2428b365-dcc1-441a-8a11-d6f55f04acb2" />
+<img width="956" height="472" alt="askmydoc_1" src="https://github.com/user-attachments/assets/2966f310-7272-4c0b-a23d-6b0593bedd62" />
+<img width="943" height="431" alt="askmydoc_2" src="https://github.com/user-attachments/assets/d2e59e57-8d0e-47a2-94f7-9176df51eefb" />
 
 ---
