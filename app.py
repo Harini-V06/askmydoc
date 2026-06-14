@@ -38,6 +38,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color:
 .msg-ai { background: #eaf4f0; border-radius: 12px 12px 12px 3px; padding: 11px 14px; font-size: 13px; color: #1e4d43; max-width: 87%; line-height: 1.6; margin-bottom: 10px; }
 .msg-user { background: #2d6a5e; border-radius: 12px 12px 3px 12px; padding: 11px 14px; font-size: 13px; color: #fff; max-width: 78%; margin-left: auto; line-height: 1.6; margin-bottom: 10px; }
 .msg-loading { background: #eaf4f0; border-radius: 12px 12px 12px 3px; padding: 11px 14px; font-size: 13px; color: #5a8a80; max-width: 87%; line-height: 1.6; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.msg-error { background: #fff0f0; border-radius: 12px 12px 12px 3px; padding: 11px 14px; font-size: 13px; color: #c0392b; max-width: 87%; line-height: 1.6; margin-bottom: 10px; border: 0.5px solid #f5c6c6; }
 .footer-bar { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 0; border-top: 0.5px solid #c8ddd9; margin-top: 16px; }
 .footer-left { font-size: 11px; color: #8ab4ac; }
 .footer-pills { display: flex; gap: 8px; }
@@ -70,31 +71,105 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
 def extract_text(pdf_file):
-    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-    return "".join(page.get_text() for page in doc)
+    """Extract plain text from an uploaded PDF.
+
+    Returns:
+        str: The extracted text content.
+
+    Raises:
+        ValueError: If the PDF contains no extractable text (e.g. scanned image).
+        RuntimeError: If PyMuPDF fails to open or read the file.
+    """
+    try:
+        doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+        text = "".join(page.get_text() for page in doc)
+        if not text.strip():
+            raise ValueError(
+                "This PDF appears to be a scanned image with no extractable text. "
+                "Please try a text-based PDF."
+            )
+        return text
+    except ValueError:
+        raise  # re-raise our own descriptive error as-is
+    except Exception as e:
+        raise RuntimeError(
+            f"Could not read the PDF. Make sure the file isn't corrupted. "
+            f"(Detail: {e})"
+        )
+
 
 def build_vector_store(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    chunks = splitter.split_text(text)
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    return FAISS.from_texts(chunks, embedding=embeddings)
+    """Chunk text and build a FAISS vector store.
+
+    Raises:
+        RuntimeError: If embedding or indexing fails.
+    """
+    try:
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        chunks = splitter.split_text(text)
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        return FAISS.from_texts(chunks, embedding=embeddings)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to build the search index. Please try uploading the PDF again. "
+            f"(Detail: {e})"
+        )
+
 
 def get_answer(vector_store, question):
-    retriever = vector_store.as_retriever(search_kwargs={"k": 3})
-    llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.3)
-    prompt = ChatPromptTemplate.from_template("""
-    Answer the question based on the context below. Be helpful and concise.
-    Context: {context}
-    Question: {question}
-    """)
-    chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-    return chain.invoke(question)
+    """Run the RAG chain and return an answer string.
+
+    Raises:
+        ValueError: If the question is empty.
+        RuntimeError: If the LLM call or retrieval fails.
+    """
+    if not question or not question.strip():
+        raise ValueError("Please type a question before sending.")
+
+    try:
+        retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+        llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.3)
+        prompt = ChatPromptTemplate.from_template("""
+Answer the question based on the context below. Be helpful and concise.
+
+Context: {context}
+
+Question: {question}
+""")
+        chain = (
+            {"context": retriever, "question": RunnablePassthrough()}
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+        return chain.invoke(question)
+
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "api key" in error_msg or "authentication" in error_msg or "401" in error_msg:
+            raise RuntimeError(
+                "API key error — make sure your GROQ_API_KEY is set in the .env file."
+            )
+        elif "rate limit" in error_msg or "429" in error_msg:
+            raise RuntimeError(
+                "Rate limit hit. Please wait a moment and try again."
+            )
+        elif "timeout" in error_msg or "connection" in error_msg:
+            raise RuntimeError(
+                "Connection issue. Check your internet and try again."
+            )
+        else:
+            raise RuntimeError(
+                f"Something went wrong while getting your answer. Please try again. "
+                f"(Detail: {e})"
+            )
+
+
+# ── session state ─────────────────────────────────────────────────────────────
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "ai", "content": "hi! drop in your pdf and i'll read it for you 🌿"}]
@@ -105,6 +180,9 @@ if "pdf_ready" not in st.session_state:
 if "pending_question" not in st.session_state:
     st.session_state.pending_question = None
 
+
+# ── layout ────────────────────────────────────────────────────────────────────
+
 col1, col2 = st.columns([1, 1.4], gap="medium")
 
 with col1:
@@ -113,10 +191,19 @@ with col1:
 
     if uploaded_file and not st.session_state.pdf_ready:
         with st.spinner("reading your document..."):
-            text = extract_text(uploaded_file)
-            st.session_state.vector_store = build_vector_store(text)
-            st.session_state.pdf_ready = True
-            st.session_state.messages = [{"role": "ai", "content": "hi! i've read your document 🌿 ask me anything about it!"}]
+            try:
+                text = extract_text(uploaded_file)
+                st.session_state.vector_store = build_vector_store(text)
+                st.session_state.pdf_ready = True
+                st.session_state.messages = [
+                    {"role": "ai", "content": "hi! i've read your document 🌿 ask me anything about it!"}
+                ]
+            except (ValueError, RuntimeError) as e:
+                # Show the friendly error message in the chat panel
+                st.session_state.messages = [
+                    {"role": "error", "content": str(e)}
+                ]
+                st.session_state.pdf_ready = False
 
     if st.session_state.pdf_ready:
         st.markdown('<div class="status-pill"><span class="green-dot"></span> ai is ready · ask away!</div>', unsafe_allow_html=True)
@@ -125,14 +212,12 @@ with col1:
 
     st.markdown("<div style='background:#fff;border-radius:14px;padding:14px 16px;border:0.5px solid #c8ddd9;'>", unsafe_allow_html=True)
     st.markdown("<div style='font-size:10px;color:#8ab4ac;letter-spacing:0.8px;margin-bottom:10px;text-transform:uppercase;'>✦ try asking</div>", unsafe_allow_html=True)
-
     suggestions = ["⌨ summarise this document", "📋 what are the key points?", "❓ explain section 2 simply"]
     for sug in suggestions:
         st.markdown('<div class="sug-btn">', unsafe_allow_html=True)
         if st.button(sug, key=f"sug_{sug}"):
             st.session_state.pending_question = sug.split(" ", 1)[1]
         st.markdown('</div>', unsafe_allow_html=True)
-
     st.markdown("</div>", unsafe_allow_html=True)
 
 with col2:
@@ -140,8 +225,10 @@ with col2:
     for msg in st.session_state.messages:
         if msg["role"] == "ai":
             chat_html += f'<div class="msg-ai">{msg["content"]}</div>'
-        else:
+        elif msg["role"] == "user":
             chat_html += f'<div class="msg-user">{msg["content"]}</div>'
+        elif msg["role"] == "error":
+            chat_html += f'<div class="msg-error">⚠️ {msg["content"]}</div>'
     chat_html += '</div>'
     st.markdown(chat_html, unsafe_allow_html=True)
 
@@ -169,8 +256,11 @@ with col2:
     if last and last["role"] == "user":
         st.markdown('<div class="msg-loading">🌿 reading and thinking...</div>', unsafe_allow_html=True)
         with st.spinner(""):
-            answer = get_answer(st.session_state.vector_store, last["content"])
-        st.session_state.messages.append({"role": "ai", "content": answer + " ✦"})
+            try:
+                answer = get_answer(st.session_state.vector_store, last["content"])
+                st.session_state.messages.append({"role": "ai", "content": answer + " ✦"})
+            except (ValueError, RuntimeError) as e:
+                st.session_state.messages.append({"role": "error", "content": str(e)})
         st.rerun()
 
 st.markdown("""
