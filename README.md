@@ -5,7 +5,6 @@ A RAG-powered PDF chatbot — upload any document and ask questions in plain Eng
 **🌐 Live Demo → [askmydoc6767.streamlit.app](https://askmydoc6767.streamlit.app/)**
 
 ---
----
 
 ## What it does
 
