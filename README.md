@@ -1,92 +1,75 @@
-# 🌿 askmydoc
+# askmydoc 🌿
 
-> upload any pdf. ask anything. get instant answers.
-
-**Live Demo →** [askmydoc6767.streamlit.app](https://askmydoc6767.streamlit.app)
----
-
-## 📌 what is this?
-
-askmydoc is a RAG (Retrieval Augmented Generation) powered chatbot that lets you have a conversation with any PDF document. upload a lecture note, textbook, or research paper — and ask questions in plain english.
-
-built as part of a self-directed Agentic AI learning curriculum.
+A RAG-powered PDF chatbot — upload any document and ask questions in plain English.
 
 ---
 
-## ✨ features
+## What it does
 
-- 📄 upload any PDF document
-- 🤖 AI reads and processes it into a vector database
-- 💬 ask questions in plain english and get instant answers
-- ⌨ clickable suggestion prompts to get started quickly
-- 🌿 loading indicator while the AI is thinking
-- 🔒 your document stays private — nothing is stored
+Upload a PDF (lecture notes, research paper, textbook) and ask questions about it in natural language. The app retrieves the most relevant chunks from your document and generates a grounded answer — no hallucinations about content that isn't there.
 
 ---
 
-## 🛠️ tech stack
+## Architecture
 
-| Layer | Technology |
+```
+PDF Upload
+  → Text Extraction     PyMuPDF (fitz)
+  → Chunking            RecursiveCharacterTextSplitter (1000 tokens, 200 overlap)
+  → Embedding           HuggingFace all-MiniLM-L6-v2
+  → Vector Store        FAISS (in-memory)
+  → Retrieval           Top-3 most relevant chunks
+  → Generation          Groq · LLaMA 3.1 8B Instant
+  → Answer
+```
+
+Built with LangChain LCEL — retrieval and generation are composed as a declarative chain rather than imperative function calls.
+
+---
+
+## Tech Stack
+
+| Component | Tool |
 |---|---|
-| Frontend | Streamlit |
-| LLM | Groq (llama-3.1-8b-instant) |
-| Embeddings | HuggingFace (all-MiniLM-L6-v2) — runs locally |
+| UI | Streamlit |
+| Embeddings | HuggingFace (all-MiniLM-L6-v2) |
 | Vector Store | FAISS |
-| PDF Reading | PyMuPDF (fitz) |
-| Orchestration | LangChain |
+| LLM | Groq (LLaMA 3.1 8B Instant) |
+| Orchestration | LangChain LCEL |
+| PDF Parsing | PyMuPDF |
 
 ---
 
-## 🚀 run locally
+## Setup
 
 ```bash
-# clone the repo
-git clone https://github.com/Harini-V06/askmydoc.git
+git clone https://github.com/Harini-V06/askmydoc
 cd askmydoc
-
-# install dependencies
 pip install -r requirements.txt
+```
 
-# create a .env file
-echo "GROQ_API_KEY=your_key_here" > .env
+Create a `.env` file in the root folder:
 
-# run the app
+```
+GROQ_API_KEY=your_key_here
+```
+
+Get a free Groq API key at [console.groq.com](https://console.groq.com).
+
+Run the app:
+
+```bash
 streamlit run app.py
 ```
 
-get a free Groq API key at [console.groq.com](https://console.groq.com)
-
 ---
 
-## 🗂️ how it works
+## What I'd improve next
 
-```
-PDF uploaded
-     ↓
-text extracted (PyMuPDF)
-     ↓
-split into chunks (LangChain text splitter)
-     ↓
-each chunk embedded into a vector (HuggingFace)
-     ↓
-stored in FAISS vector database
-     ↓
-user asks a question
-     ↓
-question embedded → similar chunks retrieved
-     ↓
-chunks + question sent to Groq LLM
-     ↓
-answer returned ✦
-```
----
- 
-## What I learned building this
- 
-- How RAG pipelines work end-to-end: chunking strategy matters a lot for answer quality
-- FAISS similarity search and how embedding distance maps to semantic relevance  
-- LangChain LCEL for composing retrieval chains
-- Managing Streamlit session state for multi-turn chat
+- Persistent vector store so re-uploads aren't needed each session
+- Conversation memory for follow-up questions
+- Multi-document support
+- Retrieval quality metrics (precision@k)
 ---
 ## Screenshots 📷
 <img width="958" height="470" alt="askmydoc_0" src="https://github.com/user-attachments/assets/2428b365-dcc1-441a-8a11-d6f55f04acb2" />
