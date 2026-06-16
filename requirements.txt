@@ -1,10 +1,10 @@
 streamlit
-langchain
-langchain-groq
-langchain-community
-langchain-text-splitters
-langchain-core
+python-dotenv
 pymupdf
+langchain
+langchain-text-splitters
+langchain-community
+langchain-core
+langchain-groq
 faiss-cpu
 sentence-transformers
-python-dotenv
